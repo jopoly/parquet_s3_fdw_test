@@ -41,6 +41,7 @@ jobs:
         echo ${pwd}
         echo ${{ github.workspace }}
         ls deps
+        cd deps/aws_s3_cpp
 
   #   - name: Build RPM
   #     run: |
