@@ -36,15 +36,18 @@ jobs:
       run: |
         apk add wget
 
-    - name: Build RPM
+    - name: Download aws and arrow
+      uses: actions/checkout@v4
       run: |
         cd deps/aws_s3_cpp && chmod -R 777 ./
         git clone --depth 1 --recursive --branch ${{ env.AWS_S3_CPP_VERSION }} https://github.com/aws/aws-sdk-cpp.git aws-sdk-cpp-${{ env.AWS_S3_CPP_VERSION }} > /dev/null
         tar -czvf aws-sdk-cpp.tar.bz2 aws-sdk-cpp-${{ env.AWS_S3_CPP_VERSION }} > /dev/null
         cd ../arrow && chmod -R 777 ./
         wget https://github.com/apache/arrow/archive/refs/tags/apache-arrow-${{ env.ARROW_VERSION }}.tar.gz --no-check-certificate
+        cd ../../
 
-        cd ../..
+    - name: Build RPM
+      run: |
         docker build -t $IMAGE_TAG \
           --build-arg DISTRIBUTION_TYPE=${{ env.RPM_DISTRIBUTION_TYPE }} \
           --build-arg PGSPIDER_PROJECT_ID=${{ env.PGSPIDER_PROJECT_ID }} \
