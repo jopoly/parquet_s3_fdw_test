@@ -34,45 +34,38 @@ jobs:
 
     - name: Before scripts
       run: |
-        apk add wget
+        apk add wget git
 
-    - name: Redirect to deps directory
-      run: cd deps/aws_s3_cpp && chmod -R 777 ./
+    # - name: Redirect to deps directory
+    #   run: cd deps/aws_s3_cpp && chmod -R 777 ./
 
-    - name: Download AWS
-      uses: actions/checkout@v4
-      with:
-        repository: aws/aws-sdk-cpp
-        ref: ${{ env.AWS_S3_CPP_VERSION }}
-        fetch-depth: 1
-        submodules: 'recursive'
-        path: ${{ github.workspace }}/deps/aws_s3_cpp
+    # - name: Download AWS
+    #   uses: actions/checkout@v4
+    #   with:
+    #     repository: aws/aws-sdk-cpp
+    #     ref: ${{ env.AWS_S3_CPP_VERSION }}
+    #     fetch-depth: 1
+    #     submodules: 'recursive'
+    #     path: ${{ github.workspace }}/deps/aws_s3_cpp
 
-    - name: Test
+    - name: Build RPM
       run: |
-        echo ${pwd}
-        ls
+        cd deps/aws_s3_cpp && chmod -R 777 ./
+        git clone --depth 1 --recursive --branch ${{ env.AWS_S3_CPP_VERSION }} https://github.com/aws/aws-sdk-cpp.git aws-sdk-cpp-${{ env.AWS_S3_CPP_VERSION }} > /dev/null
+        tar -czvf aws-sdk-cpp.tar.bz2 aws-sdk-cpp-${{ env.AWS_S3_CPP_VERSION }} > /dev/null
+        cd ../arrow && chmod -R 777 ./
+        wget https://github.com/apache/arrow/archive/refs/tags/apache-arrow-${{ env.ARROW_VERSION }}.tar.gz --no-check-certificate
         cd ../../
-        ls
 
-  #   - name: Build RPM
-  #     run: |
-  #       cd deps/aws_s3_cpp && chmod -R 777 ./
-  #       git clone --depth 1 --recursive --branch ${{ env.AWS_S3_CPP_VERSION }} https://github.com/aws/aws-sdk-cpp.git aws-sdk-cpp-${{ env.AWS_S3_CPP_VERSION }} > /dev/null
-  #       tar -czvf aws-sdk-cpp.tar.bz2 aws-sdk-cpp-${{ env.AWS_S3_CPP_VERSION }} > /dev/null
-  #       cd ../arrow && chmod -R 777 ./
-  #       wget https://github.com/apache/arrow/archive/refs/tags/apache-arrow-${{ env.ARROW_VERSION }}.tar.gz --no-check-certificate
-  #       cd ../../
-
-  #       docker build -t $IMAGE_TAG \
-  #         --build-arg DISTRIBUTION_TYPE=${{ env.RPM_DISTRIBUTION_TYPE }} \
-  #         --build-arg PGSPIDER_PROJECT_ID=${{ env.PGSPIDER_PROJECT_ID }} \
-  #         --build-arg PGSPIDER_BASE_POSTGRESQL_VERSION=${{ env.PGSPIDER_BASE_POSTGRESQL_VERSION }} \
-  #         --build-arg PGSPIDER_RPM_URL="https://github.com/${{ env.OWNER_GITHUB }}/${{ env.PGSPIDER_PROJECT_GITHUB }}/releases/download/${{ env.PGSPIDER_RELEASE_VERSION }}" \
-  #         --build-arg PARQUET_S3_FDW_RELEASE_VERSION=${{ env.PARQUET_S3_FDW_RELEASE_VERSION }} \
-  #         --build-arg AWS_S3_CPP_VERSION=${{ env.AWS_S3_CPP_VERSION }} \
-  #         --build-arg ARROW_VERSION=${{ env.ARROW_VERSION }} \
-  #         -f $DOCKERFILE .
+        docker build -t $IMAGE_TAG \
+          --build-arg DISTRIBUTION_TYPE=${{ env.RPM_DISTRIBUTION_TYPE }} \
+          --build-arg PGSPIDER_PROJECT_ID=${{ env.PGSPIDER_PROJECT_ID }} \
+          --build-arg PGSPIDER_BASE_POSTGRESQL_VERSION=${{ env.PGSPIDER_BASE_POSTGRESQL_VERSION }} \
+          --build-arg PGSPIDER_RPM_URL="https://github.com/${{ env.OWNER_GITHUB }}/${{ env.PGSPIDER_PROJECT_GITHUB }}/releases/download/${{ env.PGSPIDER_RELEASE_VERSION }}" \
+          --build-arg PARQUET_S3_FDW_RELEASE_VERSION=${{ env.PARQUET_S3_FDW_RELEASE_VERSION }} \
+          --build-arg AWS_S3_CPP_VERSION=${{ env.AWS_S3_CPP_VERSION }} \
+          --build-arg ARROW_VERSION=${{ env.ARROW_VERSION }} \
+          -f $DOCKERFILE .
 
   #   - name: Copy RPM Artifact
   #     run: |
