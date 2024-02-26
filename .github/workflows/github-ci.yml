@@ -38,6 +38,7 @@ jobs:
 
     - name: Test
       run: |
+        echo ${pwd}
         echo ${{ github.workspace }}
         ls ${{ github.workspace }}/deps/
 
