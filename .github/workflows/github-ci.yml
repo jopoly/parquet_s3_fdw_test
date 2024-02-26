@@ -43,11 +43,8 @@ jobs:
         tar -czvf aws-sdk-cpp.tar.bz2 aws-sdk-cpp-${{ env.AWS_S3_CPP_VERSION }} > /dev/null
         cd ../arrow && chmod -R 777 ./
         wget https://github.com/apache/arrow/archive/refs/tags/apache-arrow-${{ env.ARROW_VERSION }}.tar.gz --no-check-certificate
+
         cd ../..
-        echo "Building RPM ....."
-        if [ $PGSPIDER_RPM_ID ]; then
-          PGSPIDER_RPM_ID_POSTFIX="-$PGSPIDER_RPM_ID"
-        fi
         docker build -t $IMAGE_TAG \
           --build-arg DISTRIBUTION_TYPE=${{ env.RPM_DISTRIBUTION_TYPE }} \
           --build-arg PGSPIDER_PROJECT_ID=${{ env.PGSPIDER_PROJECT_ID }} \
@@ -77,7 +74,9 @@ jobs:
 
   # Job 2: Publish rpm file
   project_publish:
+    needs: project_build
     runs-on: ubuntu-latest
+    permissions: write-all
 
     steps:
     - name: Checkout Repository
