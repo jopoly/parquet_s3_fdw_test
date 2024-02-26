@@ -70,7 +70,7 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: ${{ env.RPM_ARTIFACT_DIR }}
-        ath: '${{ github.workspace }}/${{ env.RPM_ARTIFACT_DIR }}'
+        path: '${{ github.workspace }}/${{ env.RPM_ARTIFACT_DIR }}'
 
   # Job 2: Publish rpm file
   project_publish:
