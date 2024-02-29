@@ -38,7 +38,7 @@ jobs:
 
     - name: Build RPM
       run: |
-        cd deps/aws_s3_cpp && chmod -R 777 ./
+        cd docker/deps/aws_s3_cpp && chmod -R 777 ./
         git clone --depth 1 --recursive --branch ${{ env.AWS_S3_CPP_VERSION }} https://github.com/aws/aws-sdk-cpp.git aws-sdk-cpp-${{ env.AWS_S3_CPP_VERSION }} > /dev/null
         tar -czvf aws-sdk-cpp.tar.bz2 aws-sdk-cpp-${{ env.AWS_S3_CPP_VERSION }} > /dev/null
         cd ../arrow && chmod -R 777 ./
