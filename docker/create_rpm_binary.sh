@@ -1,24 +1,24 @@
 #!/bin/bash
 
-source env_rpmbuild.conf
+source docker/env_rpmbuild.conf
 set -eE
 
 # download aws-sdk and arrow packages
 # clone aws s3
-if [[ ! -d "deps/aws_s3_cpp/aws-sdk-cpp-$AWS_S3_CPP_VERSION" ]]; then
+if [[ ! -d "docker/deps/aws_s3_cpp/aws-sdk-cpp-$AWS_S3_CPP_VERSION" ]]; then
 	cd deps/aws_s3_cpp
 	chmod -R 777 ./
 	git clone --depth 1 --recursive --branch $AWS_S3_CPP_VERSION https://github.com/aws/aws-sdk-cpp.git aws-sdk-cpp-$AWS_S3_CPP_VERSION
 	tar -czvf aws-sdk-cpp.tar.bz2 aws-sdk-cpp-$AWS_S3_CPP_VERSION
-	cd ../..
+	cd ../../..
 fi
 
 # clone arrow
-if [[ ! -f "deps/arrow/apache-arrow-$ARROW_VERSION.tar.gz" ]]; then
+if [[ ! -f "docker/deps/arrow/apache-arrow-$ARROW_VERSION.tar.gz" ]]; then
 	cd deps/arrow
 	chmod -R 777 ./
 	wget https://github.com/apache/arrow/archive/refs/tags/apache-arrow-$ARROW_VERSION.tar.gz --no-check-certificate
-	cd ../..
+	cd ../../..
 fi
 
 if [[ ${PGSPIDER_RPM_ID} ]]; then
@@ -33,27 +33,26 @@ then
                  --build-arg no_proxy=${no_proxy} \
                  --build-arg ACCESS_TOKEN=${ACCESS_TOKEN} \
                  --build-arg DISTRIBUTION_TYPE=${RPM_DISTRIBUTION_TYPE} \
-                 --build-arg PGSPIDER_PROJECT_ID=$PGSPIDER_PROJECT_ID \
                  --build-arg PGSPIDER_BASE_POSTGRESQL_VERSION=${PGSPIDER_BASE_POSTGRESQL_VERSION} \
                  --build-arg PGSPIDER_RELEASE_VERSION=${PGSPIDER_RELEASE_VERSION} \
+                 --build-arg PGSPIDER_RPM_URL="https://tccloud2.toshiba.co.jp/swc/gitlab/api/v4/projects/${PGSPIDER_PROJECT_ID}/packages/generic/rpm_${DISTRIBUTION_TYPE}/${PGSPIDER_BASE_POSTGRESQL_VERSION}" \
                  --build-arg PARQUET_S3_FDW_RELEASE_VERSION=${PARQUET_S3_FDW_RELEASE_VERSION} \
                  --build-arg AWS_S3_CPP_VERSION=${AWS_S3_CPP_VERSION} \
                  --build-arg ARROW_VERSION=${ARROW_VERSION} \
                  --build-arg PGSPIDER_RPM_ID=${PGSPIDER_RPM_ID_POSTFIX} \
-                 -f $DOCKERFILE .
+                 -f docker/$DOCKERFILE .
 else
     docker build -t $IMAGE_TAG \
                  --build-arg proxy=${proxy} \
                  --build-arg no_proxy=${no_proxy} \
                  --build-arg DISTRIBUTION_TYPE=${RPM_DISTRIBUTION_TYPE} \
-                 --build-arg PGSPIDER_PROJECT_ID=$PGSPIDER_PROJECT_ID \
-                 --build-arg PGSPIDER_BASE_POSTGRESQL_VERSION=${PGSPIDER_BASE_POSTGRESQL_VERSION} \
                  --build-arg PGSPIDER_RELEASE_VERSION=${PGSPIDER_RELEASE_VERSION} \
+                 --build-arg PGSPIDER_BASE_POSTGRESQL_VERSION=${PGSPIDER_BASE_POSTGRESQL_VERSION} \
+                 --build-arg PGSPIDER_RPM_URL="https://github.com/${OWNER_GITHUB}/${PGSPIDER_PROJECT_GITHUB}/releases/download/${PGSPIDER_RELEASE_VERSION}" \
                  --build-arg PARQUET_S3_FDW_RELEASE_VERSION=${PARQUET_S3_FDW_RELEASE_VERSION} \
                  --build-arg AWS_S3_CPP_VERSION=${AWS_S3_CPP_VERSION} \
                  --build-arg ARROW_VERSION=${ARROW_VERSION} \
-                 --build-arg PGSPIDER_RPM_ID=${PGSPIDER_RPM_ID_POSTFIX} \
-                 -f $DOCKERFILE .
+                 -f docker/$DOCKERFILE .
 fi
 
 # copy binary to outside
@@ -90,6 +89,8 @@ else
                             -H \"Authorization: Bearer ${ACCESS_TOKEN}\" \
                             -H \"X-GitHub-Api-Version: 2022-11-28\" \
                             -H \"Content-Type: application/octet-stream\" \
+                            --retry 20 \
+                            --retry-max-time 120 \
                             --insecure"
     assets_uri="https://uploads.github.com/repos/${OWNER_GITHUB}/${PARQUET_S3_FDW_PROJECT_GITHUB}/releases/${PARQUET_S3_FDW_RELEASE_ID}/assets"
     binary_dir="--data-binary \"@${RPM_ARTIFACT_DIR}\""

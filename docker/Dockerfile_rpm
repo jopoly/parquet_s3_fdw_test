@@ -85,10 +85,10 @@ RUN sudo -E dnf --enablerepo=devel install -y libcurl-devel openssl-devel libuui
 WORKDIR /home/user1
 RUN mkdir -p /home/user1/parquet_s3_fdw-${PARQUET_S3_FDW_RELEASE_VERSION}
 COPY ./ /home/user1/parquet_s3_fdw-${PARQUET_S3_FDW_RELEASE_VERSION}
-RUN cp /home/user1/parquet_s3_fdw-${PARQUET_S3_FDW_RELEASE_VERSION}/parquet_s3_fdw.spec .
+RUN cp /home/user1/parquet_s3_fdw-${PARQUET_S3_FDW_RELEASE_VERSION}/docker/parquet_s3_fdw.spec .
 RUN rm -rf /home/user1/parquet_s3_fdw-${PARQUET_S3_FDW_RELEASE_VERSION}/.git \
-           /home/user1/parquet_s3_fdw-${PARQUET_S3_FDW_RELEASE_VERSION}/deps \
-           /home/user1/parquet_s3_fdw-${PARQUET_S3_FDW_RELEASE_VERSION}/create_rpm_binary.sh
+           /home/user1/parquet_s3_fdw-${PARQUET_S3_FDW_RELEASE_VERSION}/docker/deps \
+           /home/user1/parquet_s3_fdw-${PARQUET_S3_FDW_RELEASE_VERSION}/docker/create_rpm_binary.sh
 
 # Change permission
 RUN chown user1:user1 -R /home/user1/parquet_s3_fdw-${PARQUET_S3_FDW_RELEASE_VERSION}
@@ -97,14 +97,14 @@ USER user1
 WORKDIR /home/user1
 
 # Build aws s3
-COPY deps/aws_s3_cpp/aws-sdk-cpp.tar.bz2 .
-COPY deps/aws_s3_cpp/aws_s3.spec .
+COPY docker/deps/aws_s3_cpp/aws-sdk-cpp.tar.bz2 .
+COPY docker/deps/aws_s3_cpp/aws_s3.spec .
 RUN rpmbuild -ba -D "_sourcedir $(pwd)" -D "dist ${DISTRIBUTION_TYPE}" -D "aws_release_version ${AWS_S3_CPP_VERSION}" -D 'debug_package %{nil}' aws_s3.spec
 RUN sudo -E dnf localinstall -y ~/rpmbuild/RPMS/x86_64/aws_s3_cpp*.rpm
 
 # Build arrow
-COPY deps/arrow/apache-arrow-${ARROW_VERSION}.tar.gz .
-COPY deps/arrow/arrow.spec .
+COPY docker/deps/arrow/apache-arrow-${ARROW_VERSION}.tar.gz .
+COPY docker/deps/arrow/arrow.spec .
 RUN rpmbuild -ba -D "_sourcedir $(pwd)" -D "dist ${DISTRIBUTION_TYPE}" -D "arrow_release_version ${ARROW_VERSION}" -D 'debug_package %{nil}' arrow.spec
 RUN sudo -E dnf localinstall -y ~/rpmbuild/RPMS/x86_64/arrow*.rpm
 
