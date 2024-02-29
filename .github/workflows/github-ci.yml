@@ -43,7 +43,7 @@ jobs:
         tar -czvf aws-sdk-cpp.tar.bz2 aws-sdk-cpp-${{ env.AWS_S3_CPP_VERSION }} > /dev/null
         cd ../arrow && chmod -R 777 ./
         wget https://github.com/apache/arrow/archive/refs/tags/apache-arrow-${{ env.ARROW_VERSION }}.tar.gz --no-check-certificate
-        cd ../../
+        cd ../../../
 
         docker build -t $IMAGE_TAG \
           --build-arg DISTRIBUTION_TYPE=${{ env.RPM_DISTRIBUTION_TYPE }} \
