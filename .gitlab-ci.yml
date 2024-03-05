@@ -1,0 +1,105 @@
+stages:
+  - build
+  - publish
+
+default:
+  tags:
+    - benzaiten-autoscale
+
+# Global variable (can configure outside in gitlab web)
+variables:
+  PROXY: "http://proxy.toshiba.co.jp:8080"
+  NO_PROXY: "127.0.0.1,tccloud2.toshiba.co.jp,localhost,docker"
+  ACCESS_TOKEN: "J-CyStgYPMWeTFSY_Ubs"
+  PGSPIDER_PROJECT_ID: "16"
+  RPM_ARTIFACT_DIR: "fdw_rpm"
+  PGSPIDER_RELEASE_VERSION: "4.0.0"
+  PGSPIDER_BASE_POSTGRESQL_VERSION: "16"
+  RPM_DISTRIBUTION_TYPE: "rhel8"
+  PGSPIDER_RPM_ID: "11835"
+  PARQUET_S3_FDW_RELEASE_VERSION: "1.1.0"
+  AWS_S3_CPP_VERSION: "1.11.91"
+  ARROW_VERSION: "12.0.0"
+
+project_build:
+  stage: build
+  image: docker:24.0.5
+  services:
+    - docker:24.0.5-dind
+  variables:
+    IMAGE_TAG: "fdw_build"
+    DOCKERFILE: "Dockerfile_rpm"
+  before_script:
+    - export http_proxy=$PROXY && export https_proxy=$PROXY
+    - export no_proxy=$NO_PROXY
+    - apk add git && apk add wget
+    # handle if the previous pipeline error
+    - docker rm $(docker stop test) || true
+    - docker rmi $IMAGE_TAG || true
+    - echo "y" | docker system prune
+  script:
+    # Get AWS-SDK-CPP and ARROW
+    - cd docker/deps/aws_s3_cpp && chmod -R 777 ./
+    - git clone --depth 1 --recursive --branch $AWS_S3_CPP_VERSION https://github.com/aws/aws-sdk-cpp.git aws-sdk-cpp-$AWS_S3_CPP_VERSION > /dev/null
+    - tar -czvf aws-sdk-cpp.tar.bz2 aws-sdk-cpp-$AWS_S3_CPP_VERSION > /dev/null
+    - cd ../arrow && chmod -R 777 ./
+    - wget https://github.com/apache/arrow/archive/refs/tags/apache-arrow-$ARROW_VERSION.tar.gz --no-check-certificate 
+    - cd ../../..
+    # Build
+    - echo "Building RPM ....."
+    - if [ $PGSPIDER_RPM_ID ]; then PGSPIDER_RPM_ID_POSTFIX="-$PGSPIDER_RPM_ID"; fi
+    - docker build -t $IMAGE_TAG
+                  --build-arg proxy=$PROXY
+                  --build-arg no_proxy=$NO_PROXY
+                  --build-arg ACCESS_TOKEN=$ACCESS_TOKEN
+                  --build-arg DISTRIBUTION_TYPE=$RPM_DISTRIBUTION_TYPE
+                  --build-arg PGSPIDER_PROJECT_ID=$PGSPIDER_PROJECT_ID
+                  --build-arg PGSPIDER_BASE_POSTGRESQL_VERSION=$PGSPIDER_BASE_POSTGRESQL_VERSION
+                  --build-arg PGSPIDER_RELEASE_VERSION=$PGSPIDER_RELEASE_VERSION
+                  --build-arg PARQUET_S3_FDW_RELEASE_VERSION=$PARQUET_S3_FDW_RELEASE_VERSION
+                  --build-arg AWS_S3_CPP_VERSION=$AWS_S3_CPP_VERSION
+                  --build-arg ARROW_VERSION=$ARROW_VERSION
+                  --build-arg PGSPIDER_RPM_ID=$PGSPIDER_RPM_ID_POSTFIX
+                  -f docker/$DOCKERFILE .
+    # get rpm file from docker image
+    - mkdir -p $RPM_ARTIFACT_DIR
+    - docker run -d --name test $IMAGE_TAG /usr/sbin/init
+    - docker cp test:/home/user1/rpmbuild/RPMS/x86_64 $RPM_ARTIFACT_DIR
+    # clean-up: delete docker image
+    - docker rm $(docker stop test)
+    - docker rmi $IMAGE_TAG
+    - cp $RPM_ARTIFACT_DIR/x86_64/* $RPM_ARTIFACT_DIR
+    - rm -rf $RPM_ARTIFACT_DIR/x86_64/
+  timeout: 3 hours
+  artifacts:
+    paths:
+      - $RPM_ARTIFACT_DIR
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+
+# Push RPM to Registry job
+project_publish:
+  stage: publish
+  before_script:
+    - export http_proxy=$PROXY && export https_proxy=$PROXY
+    - export no_proxy=$NO_PROXY
+    - apt-get update -qq && apt-get install -y -qq curl
+  variables:
+    curl_command: "curl --header \"PRIVATE-TOKEN: $ACCESS_TOKEN\" --insecure --upload-file"
+    package_uri: "https://tccloud2.toshiba.co.jp/swc/gitlab/api/v4/projects/$CI_PROJECT_ID/packages/generic/rpm_$RPM_DISTRIBUTION_TYPE/$PGSPIDER_BASE_POSTGRESQL_VERSION"
+  script:
+    - echo "Publishing ....."
+    # aws_s3_cpp
+    - eval "$curl_command $RPM_ARTIFACT_DIR/arrow-$ARROW_VERSION-$RPM_DISTRIBUTION_TYPE.x86_64.rpm
+                          $package_uri/arrow-$ARROW_VERSION-$RPM_DISTRIBUTION_TYPE.x86_64-$CI_PIPELINE_ID.rpm"
+    # arrow
+    - eval "$curl_command $RPM_ARTIFACT_DIR/aws_s3_cpp-$AWS_S3_CPP_VERSION-$RPM_DISTRIBUTION_TYPE.x86_64.rpm
+                          $package_uri/aws_s3_cpp-$AWS_S3_CPP_VERSION-$RPM_DISTRIBUTION_TYPE.x86_64-$CI_PIPELINE_ID.rpm"
+    # parquet_s3_fdw
+    - eval "$curl_command $RPM_ARTIFACT_DIR/parquet_s3_fdw_$PGSPIDER_BASE_POSTGRESQL_VERSION-$PARQUET_S3_FDW_RELEASE_VERSION-$RPM_DISTRIBUTION_TYPE.x86_64.rpm
+                          $package_uri/parquet_s3_fdw_$PGSPIDER_BASE_POSTGRESQL_VERSION-$PARQUET_S3_FDW_RELEASE_VERSION-$RPM_DISTRIBUTION_TYPE.x86_64-$CI_PIPELINE_ID.rpm"
+    # debugsource
+    - eval "$curl_command $RPM_ARTIFACT_DIR/parquet_s3_fdw_$PGSPIDER_BASE_POSTGRESQL_VERSION-debugsource-$PARQUET_S3_FDW_RELEASE_VERSION-$RPM_DISTRIBUTION_TYPE.x86_64.rpm
+                          $package_uri/parquet_s3_fdw_$PGSPIDER_BASE_POSTGRESQL_VERSION-debugsource-$PARQUET_S3_FDW_RELEASE_VERSION-$RPM_DISTRIBUTION_TYPE.x86_64-$CI_PIPELINE_ID.rpm"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web"'

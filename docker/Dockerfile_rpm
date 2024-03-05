@@ -1,0 +1,119 @@
+FROM rockylinux:8.8
+
+ARG ACCESS_TOKEN
+ARG proxy
+ARG no_proxy
+
+ENV http_proxy ${proxy}
+ENV https_proxy ${proxy}
+ENV no_proxy ${no_proxy}
+
+ARG DISTRIBUTION_TYPE
+ARG PGSPIDER_RPM_ID
+ARG PGSPIDER_BASE_POSTGRESQL_VERSION
+ARG PGSPIDER_RELEASE_VERSION
+ARG PGSPIDER_RPM_URL
+
+ARG PARQUET_S3_FDW_RELEASE_VERSION
+ARG AWS_S3_CPP_VERSION
+ARG ARROW_VERSION
+ARG PG_INS=/usr/pgsql-16
+
+# Add postgres repository for pgdg-srpm-macros
+RUN dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+
+RUN dnf install -y sudo bzip2 rpm-build wget pgdg-srpm-macros cmake
+RUN dnf --enablerepo=powertools install -y perl-IPC-Run
+
+# Install PGSpider
+RUN if [[ -z ${ACCESS_TOKEN} ]]; then \
+        wget -O /root/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-libs-${PGSPIDER_RELEASE_VERSION}-${DISTRIBUTION_TYPE}.x86_64.rpm \
+        ${PGSPIDER_RPM_URL}/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-libs-${PGSPIDER_RELEASE_VERSION}-${DISTRIBUTION_TYPE}.x86_64.rpm --no-check-certificate ; \
+    else \
+        curl --header "PRIVATE-TOKEN: ${ACCESS_TOKEN}" \
+        ${PGSPIDER_RPM_URL}/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-libs-${PGSPIDER_RELEASE_VERSION}-${DISTRIBUTION_TYPE}.x86_64${PGSPIDER_RPM_ID}.rpm \
+        -o /root/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-libs-${PGSPIDER_RELEASE_VERSION}-${DISTRIBUTION_TYPE}.x86_64.rpm \
+        --insecure ; \
+    fi
+RUN if [[ -z ${ACCESS_TOKEN} ]]; then \
+        wget -O /root/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-${PGSPIDER_RELEASE_VERSION}-${DISTRIBUTION_TYPE}.x86_64.rpm \
+        ${PGSPIDER_RPM_URL}/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-${PGSPIDER_RELEASE_VERSION}-${DISTRIBUTION_TYPE}.x86_64.rpm --no-check-certificate ; \
+    else \
+        curl --header "PRIVATE-TOKEN: ${ACCESS_TOKEN}" \
+        ${PGSPIDER_RPM_URL}/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-${PGSPIDER_RELEASE_VERSION}-${DISTRIBUTION_TYPE}.x86_64${PGSPIDER_RPM_ID}.rpm \
+        -o /root/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-${PGSPIDER_RELEASE_VERSION}-${DISTRIBUTION_TYPE}.x86_64.rpm \
+        --insecure ; \
+    fi
+
+RUN if [[ -z ${ACCESS_TOKEN} ]]; then \
+        wget -O /root/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-devel-${PGSPIDER_RELEASE_VERSION}-${DISTRIBUTION_TYPE}.x86_64.rpm \
+        ${PGSPIDER_RPM_URL}/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-devel-${PGSPIDER_RELEASE_VERSION}-${DISTRIBUTION_TYPE}.x86_64.rpm --no-check-certificate ; \
+    else \
+        curl --header "PRIVATE-TOKEN: ${ACCESS_TOKEN}" \
+        ${PGSPIDER_RPM_URL}/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-devel-${PGSPIDER_RELEASE_VERSION}-${DISTRIBUTION_TYPE}.x86_64${PGSPIDER_RPM_ID}.rpm \
+        -o /root/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-devel-${PGSPIDER_RELEASE_VERSION}-${DISTRIBUTION_TYPE}.x86_64.rpm \
+        --insecure ; \
+    fi
+
+RUN if [[ -z ${ACCESS_TOKEN} ]]; then \
+        wget -O /root/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-server-${PGSPIDER_RELEASE_VERSION}-${DISTRIBUTION_TYPE}.x86_64.rpm \
+        ${PGSPIDER_RPM_URL}/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-server-${PGSPIDER_RELEASE_VERSION}-${DISTRIBUTION_TYPE}.x86_64.rpm --no-check-certificate ; \
+    else \
+        curl --header "PRIVATE-TOKEN: ${ACCESS_TOKEN}" \
+        ${PGSPIDER_RPM_URL}/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-server-${PGSPIDER_RELEASE_VERSION}-${DISTRIBUTION_TYPE}.x86_64${PGSPIDER_RPM_ID}.rpm \
+        -o /root/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-server-${PGSPIDER_RELEASE_VERSION}-${DISTRIBUTION_TYPE}.x86_64.rpm \
+        --insecure ; \
+    fi
+
+RUN dnf -y localinstall \
+    --setopt=skip_missing_names_on_install=False \
+    /root/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-libs-${PGSPIDER_RELEASE_VERSION}-${DISTRIBUTION_TYPE}.x86_64.rpm \
+    /root/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-${PGSPIDER_RELEASE_VERSION}-${DISTRIBUTION_TYPE}.x86_64.rpm \
+    /root/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-devel-${PGSPIDER_RELEASE_VERSION}-${DISTRIBUTION_TYPE}.x86_64.rpm \
+    /root/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-server-${PGSPIDER_RELEASE_VERSION}-${DISTRIBUTION_TYPE}.x86_64.rpm
+
+# Create non-super user and put ROM files.
+# User on host will mapped to this user.
+RUN useradd -m user1
+RUN echo "user1:user1" | chpasswd
+RUN echo "user1 ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+# Install dependencies
+RUN sudo -E dnf --enablerepo=devel install -y libcurl-devel openssl-devel libuuid-devel pulseaudio-libs-devel snappy-devel
+
+# Transfer files
+WORKDIR /home/user1
+RUN mkdir -p /home/user1/parquet_s3_fdw-${PARQUET_S3_FDW_RELEASE_VERSION}
+COPY ./ /home/user1/parquet_s3_fdw-${PARQUET_S3_FDW_RELEASE_VERSION}
+RUN cp /home/user1/parquet_s3_fdw-${PARQUET_S3_FDW_RELEASE_VERSION}/docker/parquet_s3_fdw.spec .
+RUN rm -rf /home/user1/parquet_s3_fdw-${PARQUET_S3_FDW_RELEASE_VERSION}/.git \
+           /home/user1/parquet_s3_fdw-${PARQUET_S3_FDW_RELEASE_VERSION}/docker/deps \
+           /home/user1/parquet_s3_fdw-${PARQUET_S3_FDW_RELEASE_VERSION}/docker/create_rpm_binary.sh
+
+# Change permission
+RUN chown user1:user1 -R /home/user1/parquet_s3_fdw-${PARQUET_S3_FDW_RELEASE_VERSION}
+
+USER user1
+WORKDIR /home/user1
+
+# Build aws s3
+COPY docker/deps/aws_s3_cpp/aws-sdk-cpp.tar.bz2 .
+COPY docker/deps/aws_s3_cpp/aws_s3.spec .
+RUN rpmbuild -ba -D "_sourcedir $(pwd)" -D "dist ${DISTRIBUTION_TYPE}" -D "aws_release_version ${AWS_S3_CPP_VERSION}" -D 'debug_package %{nil}' aws_s3.spec
+RUN sudo -E dnf localinstall -y ~/rpmbuild/RPMS/x86_64/aws_s3_cpp*.rpm
+
+# Build arrow
+COPY docker/deps/arrow/apache-arrow-${ARROW_VERSION}.tar.gz .
+COPY docker/deps/arrow/arrow.spec .
+RUN rpmbuild -ba -D "_sourcedir $(pwd)" -D "dist ${DISTRIBUTION_TYPE}" -D "arrow_release_version ${ARROW_VERSION}" -D 'debug_package %{nil}' arrow.spec
+RUN sudo -E dnf localinstall -y ~/rpmbuild/RPMS/x86_64/arrow*.rpm
+
+# Build parquet_s3
+RUN tar cvjf parquet_s3_fdw.tar.bz2 parquet_s3_fdw-${PARQUET_S3_FDW_RELEASE_VERSION}
+RUN rpmbuild -ba -D "_sourcedir $(pwd)" -D "release_version ${PARQUET_S3_FDW_RELEASE_VERSION}" -D "dist ${DISTRIBUTION_TYPE}" -D "pgmajorversion ${PGSPIDER_BASE_POSTGRESQL_VERSION}" -D "pginstdir ${PG_INS}" parquet_s3_fdw.spec
+
+# unset proxy
+ENV http_proxy=
+ENV https_proxy=
+ENV no_proxy=
+RUN sudo sed -i "s/.*proxy=.*/proxy=/g" /etc/dnf/dnf.conf

@@ -1,0 +1,4 @@
+*.sh
+Jenkinsfile
+.gitlab-ci.yml
+fdw_rpm/
