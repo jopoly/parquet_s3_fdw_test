@@ -45,12 +45,12 @@ RUN if [[ -n ${POSTGRESQL_BASE_VERSION} && -n ${POSTGRESQL_VERSION} ]]; then \
         . /tmp/params.txt && \
         eval curl ${PARAM_CURL_OPTS} \
             ${POSTGRESQL_RPM_URL}/postgresql${POSTGRESQL_BASE_VERSION}-libs-${POSTGRESQL_VERSION}PGDG.rhel8.x86_64.rpm \
-            -o /root/postgresql${POSTGRESQL_BASE_VERSION}-libs-${POSTGRESQL_VERSION}PGDG.rhel8.x86_64.rpm; \
+            -o /root/postgresql${POSTGRESQL_BASE_VERSION}-libs-${POSTGRESQL_VERSION}PGDG.rhel8.x86_64.rpm -L; \
     else \
         . /tmp/params.txt && \
         eval curl ${PARAM_CURL_OPTS} \
             ${PGSPIDER_RPM_URL}/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-libs-${PGSPIDER_RELEASE_VERSION}.rhel8.x86_64${PGSPIDER_RPM_ID}.rpm \
-            -o /root/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-libs-${PGSPIDER_RELEASE_VERSION}.rhel8.x86_64.rpm; \
+            -o /root/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-libs-${PGSPIDER_RELEASE_VERSION}.rhel8.x86_64.rpm -L; \
     fi
 
 # Download PostgreSQL/PGSpider core
@@ -58,12 +58,12 @@ RUN if [[ -n ${POSTGRESQL_BASE_VERSION} && -n ${POSTGRESQL_VERSION} ]]; then \
         . /tmp/params.txt && \
         eval curl ${PARAM_CURL_OPTS} \
             ${POSTGRESQL_RPM_URL}/postgresql${POSTGRESQL_BASE_VERSION}-${POSTGRESQL_VERSION}PGDG.rhel8.x86_64.rpm \
-            -o /root/postgresql${POSTGRESQL_BASE_VERSION}-${POSTGRESQL_VERSION}PGDG.rhel8.x86_64.rpm; \
+            -o /root/postgresql${POSTGRESQL_BASE_VERSION}-${POSTGRESQL_VERSION}PGDG.rhel8.x86_64.rpm -L; \
     else \
         . /tmp/params.txt && \
         eval curl ${PARAM_CURL_OPTS} \
             ${PGSPIDER_RPM_URL}/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-${PGSPIDER_RELEASE_VERSION}.rhel8.x86_64${PGSPIDER_RPM_ID}.rpm \
-            -o /root/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-${PGSPIDER_RELEASE_VERSION}.rhel8.x86_64.rpm; \
+            -o /root/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-${PGSPIDER_RELEASE_VERSION}.rhel8.x86_64.rpm -L; \
     fi
 
 # Download PostgreSQL/PGSpider server
@@ -71,12 +71,12 @@ RUN if [[ -n ${POSTGRESQL_BASE_VERSION} && -n ${POSTGRESQL_VERSION} ]]; then \
         . /tmp/params.txt && \
         eval curl ${PARAM_CURL_OPTS} \
             ${POSTGRESQL_RPM_URL}/postgresql${POSTGRESQL_BASE_VERSION}-server-${POSTGRESQL_VERSION}PGDG.rhel8.x86_64.rpm \
-            -o /root/postgresql${POSTGRESQL_BASE_VERSION}-server-${POSTGRESQL_VERSION}PGDG.rhel8.x86_64.rpm; \
+            -o /root/postgresql${POSTGRESQL_BASE_VERSION}-server-${POSTGRESQL_VERSION}PGDG.rhel8.x86_64.rpm -L; \
     else \
         . /tmp/params.txt && \
         eval curl ${PARAM_CURL_OPTS} \
             ${PGSPIDER_RPM_URL}/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-server-${PGSPIDER_RELEASE_VERSION}.rhel8.x86_64${PGSPIDER_RPM_ID}.rpm \
-            -o /root/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-server-${PGSPIDER_RELEASE_VERSION}.rhel8.x86_64.rpm; \
+            -o /root/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-server-${PGSPIDER_RELEASE_VERSION}.rhel8.x86_64.rpm -L; \
     fi
 
 # Download PostgreSQL/PGSpider devel
@@ -84,12 +84,12 @@ RUN if [[ -n ${POSTGRESQL_BASE_VERSION} && -n ${POSTGRESQL_VERSION} ]]; then \
         . /tmp/params.txt && \
         eval curl ${PARAM_CURL_OPTS} \
             ${POSTGRESQL_RPM_URL}/postgresql${POSTGRESQL_BASE_VERSION}-devel-${POSTGRESQL_VERSION}PGDG.rhel8.x86_64.rpm \
-            -o /root/postgresql${POSTGRESQL_BASE_VERSION}-devel-${POSTGRESQL_VERSION}PGDG.rhel8.x86_64.rpm; \
+            -o /root/postgresql${POSTGRESQL_BASE_VERSION}-devel-${POSTGRESQL_VERSION}PGDG.rhel8.x86_64.rpm -L; \
     else \
         . /tmp/params.txt && \
         eval curl ${PARAM_CURL_OPTS} \
             ${PGSPIDER_RPM_URL}/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-devel-${PGSPIDER_RELEASE_VERSION}.rhel8.x86_64${PGSPIDER_RPM_ID}.rpm \
-            -o /root/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-devel-${PGSPIDER_RELEASE_VERSION}.rhel8.x86_64.rpm; \
+            -o /root/pgspider${PGSPIDER_BASE_POSTGRESQL_VERSION}-devel-${PGSPIDER_RELEASE_VERSION}.rhel8.x86_64.rpm -L; \
     fi
 
 # Install PostgreSQL/PGSpider
