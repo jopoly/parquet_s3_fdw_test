@@ -4,15 +4,17 @@ on:
   workflow_dispatch:
 
 env:
-  OWNER_GITHUB: "jopoly"                      # User name. For example: [user_name] in https://github.com/user_name/your_repository.git
-  PGSPIDER_PROJECT_GITHUB: "pgspider_test"     # Repository name. For example: [your_repository] in https://github.com/user_name/your_repository.git
-  RPM_ARTIFACT_DIR: "fdw_rpm"                    # Directory name of Artifact to contain rpm files temporary. Default is "fdw_rpm".
-  PGSPIDER_RELEASE_VERSION: "4.0.0"              # Release version. For example: 4.1.0.
+  OWNER_GITHUB: "jopoly"                       # User name. For example: [user_name] in https://github.com/user_name/your_repository.git
+  PGSPIDER_PROJECT_GITHUB: "pgspider_test"            # Repository name of pgspider. For example: [your_repository] in https://github.com/user_name/your_repository.git
+  ARTIFACT_DIR: "fdw_rpm"                        # Directory name of Artifact to contain rpm files temporary. Default is "fdw_rpm".
+  PGSPIDER_RELEASE_VERSION: "4.0.1-1"            # Release version of pgspider. For example: 4.0.0-1.
+  PGSPIDER_RELEASE_PACKAGE_VERSION: "4.0.1"      # Release package version
   PGSPIDER_BASE_POSTGRESQL_VERSION: "16"         # Main version of postgresql that pgspider based on it. For example: 16.
-  RPM_DISTRIBUTION_TYPE: "rhel8"                 # The distribution operating system name. Default is "rhel8".
   PARQUET_S3_FDW_RELEASE_VERSION: "1.1.0"
   AWS_S3_CPP_VERSION: "1.11.91"
   ARROW_VERSION: "12.0.0"
+  PACKAGE_RELEASE_VERSION: "1"
+  
 
 jobs:
   # Job 1: Build rpm files and upload them to Artifact
@@ -28,7 +30,7 @@ jobs:
 
     steps:
     - name: Checkout Repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
     - name: Before scripts
       run: |
@@ -36,7 +38,7 @@ jobs:
 
     - name: Build RPM
       run: |
-        cd docker/deps/aws_s3_cpp && chmod -R 777 ./
+        cd rpm/deps/aws_s3_cpp && chmod -R 777 ./
         git clone --depth 1 --recursive --branch ${{ env.AWS_S3_CPP_VERSION }} https://github.com/aws/aws-sdk-cpp.git aws-sdk-cpp-${{ env.AWS_S3_CPP_VERSION }} > /dev/null
         tar -czvf aws-sdk-cpp.tar.bz2 aws-sdk-cpp-${{ env.AWS_S3_CPP_VERSION }} > /dev/null
         cd ../arrow && chmod -R 777 ./
@@ -44,31 +46,33 @@ jobs:
         cd ../../..
 
         docker build -t $IMAGE_TAG \
-          --build-arg DISTRIBUTION_TYPE=${{ env.RPM_DISTRIBUTION_TYPE }} \
+          --build-arg PACKAGE_RELEASE_VERSION=${{ env.PACKAGE_RELEASE_VERSION }} \
           --build-arg PGSPIDER_RELEASE_VERSION=${{ env.PGSPIDER_RELEASE_VERSION }} \
           --build-arg PGSPIDER_BASE_POSTGRESQL_VERSION=${{ env.PGSPIDER_BASE_POSTGRESQL_VERSION }} \
-          --build-arg PGSPIDER_RPM_URL="https://github.com/${{ env.OWNER_GITHUB }}/${{ env.PGSPIDER_PROJECT_GITHUB }}/releases/download/${{ env.PGSPIDER_RELEASE_VERSION }}" \
+          --build-arg PGSPIDER_RELEASE_PACKAGE_VERSION=${{ env.PGSPIDER_RELEASE_PACKAGE_VERSION }} \
+          --build-arg PGSPIDER_RPM_URL="https://github.com/${{ env.OWNER_GITHUB }}/${{ env.PGSPIDER_PROJECT_GITHUB }}/releases/download/${{ env.PGSPIDER_RELEASE_PACKAGE_VERSION  }}" \
           --build-arg PARQUET_S3_FDW_RELEASE_VERSION=${{ env.PARQUET_S3_FDW_RELEASE_VERSION }} \
           --build-arg AWS_S3_CPP_VERSION=${{ env.AWS_S3_CPP_VERSION }} \
+          --build-arg PGSPIDER_RPM_ID= \
           --build-arg ARROW_VERSION=${{ env.ARROW_VERSION }} \
-          -f docker/$DOCKERFILE .
+          -f rpm/$DOCKERFILE .
 
     - name: Copy RPM Artifact
       run: |
-        mkdir -p ${{ env.RPM_ARTIFACT_DIR }}
+        mkdir -p ${{ env.ARTIFACT_DIR }}
         docker run -d --name test $IMAGE_TAG /usr/sbin/init
-        docker cp test:/home/user1/rpmbuild/RPMS/x86_64 ${{ env.RPM_ARTIFACT_DIR }}
+        docker cp test:/home/user1/rpmbuild/RPMS/x86_64 ${{ env.ARTIFACT_DIR }}
 
     - name: Move rpm files
       run: |
-        cp ${{ env.RPM_ARTIFACT_DIR }}/x86_64/* ${{ env.RPM_ARTIFACT_DIR }}
-        rm -rf ${{ env.RPM_ARTIFACT_DIR }}/x86_64/
+        cp ${{ env.ARTIFACT_DIR}}/x86_64/* ${{ env.ARTIFACT_DIR }}
+        rm -rf ${{ env.ARTIFACT_DIR }}/x86_64/
 
     - name: Upload RPM Artifact
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
-        name: ${{ env.RPM_ARTIFACT_DIR }}
-        path: '${{ github.workspace }}/${{ env.RPM_ARTIFACT_DIR }}'
+        name: ${{ env.ARTIFACT_DIR }}
+        path: '${{ github.workspace }}/${{ env.ARTIFACT_DIR }}'
 
   # Job 2: Publish rpm file
   project_publish:
@@ -78,7 +82,7 @@ jobs:
 
     steps:
     - name: Checkout Repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
     - name: Install curl
       run: sudo apt-get update -qq && sudo apt-get install -y -qq curl
@@ -97,9 +101,9 @@ jobs:
 
     # Download rpm files from Artifact
     - name: Download RPM Artifact
-      uses: actions/download-artifact@v2
+      uses: actions/download-artifact@v4
       with:
-        name: ${{ env.RPM_ARTIFACT_DIR }}
+        name: ${{ env.ARTIFACT_DIR }}
 
     # Upload rpm files to release that is created in previous step
     - name: Upload arrow rpm
@@ -108,8 +112,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./arrow-${{ env.ARROW_VERSION }}-${{ env.RPM_DISTRIBUTION_TYPE }}.x86_64.rpm
-        asset_name: arrow-${{ env.ARROW_VERSION }}-${{ env.RPM_DISTRIBUTION_TYPE }}.x86_64.rpm
+        asset_path: ./arrow-${{ env.ARROW_VERSION }}-${{ env.PACKAGE_RELEASE_VERSION }}.rhel8.x86_64.rpm
+        asset_name: arrow-${{ env.ARROW_VERSION }}-${{ env.PACKAGE_RELEASE_VERSION }}.rhel8.x86_64.rpm
         asset_content_type: application/octet-stream
 
     - name: Upload aws rpm
@@ -118,8 +122,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./aws_s3_cpp-${{ env.AWS_S3_CPP_VERSION }}-${{ env.RPM_DISTRIBUTION_TYPE }}.x86_64.rpm
-        asset_name: aws_s3_cpp-${{ env.AWS_S3_CPP_VERSION }}-${{ env.RPM_DISTRIBUTION_TYPE }}.x86_64.rpm
+        asset_path: ./aws_s3_cpp-${{ env.AWS_S3_CPP_VERSION }}-${{ env.PACKAGE_RELEASE_VERSION }}.rhel8.x86_64.rpm
+        asset_name: aws_s3_cpp-${{ env.AWS_S3_CPP_VERSION }}-${{ env.PACKAGE_RELEASE_VERSION }}.rhel8.x86_64.rpm
         asset_content_type: application/octet-stream
 
     - name: Upload parquet_s3_fdw rpm
@@ -128,8 +132,8 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./parquet_s3_fdw_${{ env.PGSPIDER_BASE_POSTGRESQL_VERSION }}-${{ env.PARQUET_S3_FDW_RELEASE_VERSION }}-${{ env.RPM_DISTRIBUTION_TYPE }}.x86_64.rpm
-        asset_name: parquet_s3_fdw_${{ env.PGSPIDER_BASE_POSTGRESQL_VERSION }}-${{ env.PARQUET_S3_FDW_RELEASE_VERSION }}-${{ env.RPM_DISTRIBUTION_TYPE }}.x86_64.rpm
+        asset_path: ./parquet_s3_fdw_${{ env.PGSPIDER_BASE_POSTGRESQL_VERSION }}-${{ env.PARQUET_S3_FDW_RELEASE_VERSION }}-${{ env.PACKAGE_RELEASE_VERSION }}.rhel8.x86_64.rpm
+        asset_name: parquet_s3_fdw_${{ env.PGSPIDER_BASE_POSTGRESQL_VERSION }}-${{ env.PARQUET_S3_FDW_RELEASE_VERSION }}-${{ env.PACKAGE_RELEASE_VERSION }}.rhel8.x86_64.rpm
         asset_content_type: application/octet-stream
 
     - name: Upload debugsource rpm
@@ -138,6 +142,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./parquet_s3_fdw_${{ env.PGSPIDER_BASE_POSTGRESQL_VERSION }}-debugsource-${{ env.PARQUET_S3_FDW_RELEASE_VERSION }}-${{ env.RPM_DISTRIBUTION_TYPE }}.x86_64.rpm
-        asset_name: parquet_s3_fdw_${{ env.PGSPIDER_BASE_POSTGRESQL_VERSION }}-debugsource-${{ env.PARQUET_S3_FDW_RELEASE_VERSION }}-${{ env.RPM_DISTRIBUTION_TYPE }}.x86_64.rpm
+        asset_path: ./parquet_s3_fdw_${{ env.PGSPIDER_BASE_POSTGRESQL_VERSION }}-debugsource-${{ env.PARQUET_S3_FDW_RELEASE_VERSION }}-${{ env.PACKAGE_RELEASE_VERSION }}.rhel8.x86_64.rpm
+        asset_name: parquet_s3_fdw_${{ env.PGSPIDER_BASE_POSTGRESQL_VERSION }}-debugsource-${{ env.PARQUET_S3_FDW_RELEASE_VERSION }}-${{ env.PACKAGE_RELEASE_VERSION }}.rhel8.x86_64.rpm
         asset_content_type: application/octet-stream

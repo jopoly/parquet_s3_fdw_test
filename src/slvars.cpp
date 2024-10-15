@@ -272,7 +272,12 @@ parquet_s3_slvars_walker(Node *node, pull_slvars_context *context)
 	/* Should not find an unplanned subquery */
 	Assert(!IsA(node, Query));
 
-	return expression_tree_walker(node, (bool (*)())parquet_s3_slvars_walker,
+	return expression_tree_walker(node,
+#if PG_VERSION_NUM >= 160000
+								  (bool (*))parquet_s3_slvars_walker,
+#else
+								  (bool (*)())parquet_s3_slvars_walker,
+#endif
 								  (void *) context);
 }
 
